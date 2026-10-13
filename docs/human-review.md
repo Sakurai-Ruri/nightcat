@@ -7,28 +7,21 @@
 
 生成时间：第 3 步（最小 UI + 作息可编辑）之后。共 6 项需要决定，若干项需要你亲眼看一眼。
 
+最后更新：仓库已公开推送到 https://github.com/Sakurai-Ruri/nightcat —— 因此**本文件现在是公开的**。里面提到的机器信息（npm 缓存路径、代理端口）已确认可以公开。
+
 ---
 
 ## A. 需要你做决定（AI 不应该替你定）
 
-### A-1. Git 提交署名是占位值
+### A-1. Git 提交署名 ✅ 已完成
 
-- [ ] 已改成我自己的 name / email
+- [x] 已改成我自己的 name / email
 
-**现状**：`~/.git` 全局身份是空的，所以本仓库用了占位署名 `NightCat Dev <dev@localhost>`（当时你选的"先用占位"）。目前 4 个 commit 都是这个署名。
+**结果**：仓库级身份设为 `Sakurai-Ruri <SakuraiRuri@outlook.com>`，5 个提交的作者已在**推送前**全部重写（`git rebase --root --exec 'git commit --amend --no-edit --reset-author'`）。GitHub API 已确认 5 个提交都关联到 `Sakurai-Ruri` 账号，会计入贡献图。
 
-**为什么要你决定**：这决定了提交历史的署名，而且**已经提交的历史改了要重写**（`git rebase`/`filter-repo`），越早改越便宜。
+**为什么在推送前做**：历史一旦公开，改署名就要重写已发布的历史并联系 GitHub 清理缓存；推送前改写只是本地一次 rebase，成本最低。
 
-**怎么做**：
-
-```bash
-cd nightcat
-git config user.name "你的名字"
-git config user.email "你的邮箱"
-
-# 若要把已提交的 4 个 commit 一起改成新署名：
-git rebase --root --exec 'git commit --amend --no-edit --reset-author'
-```
+**已知取舍**：真实邮箱会出现在每个公开提交的元数据里，任何人 `git log` 都能看到。这是明确选择的结果（备选是 `213432473+Sakurai-Ruri@users.noreply.github.com`，同样计入贡献图但不暴露邮箱）。若以后想换，需要重写历史并强推。
 
 ---
 
