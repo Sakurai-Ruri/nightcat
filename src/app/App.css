@@ -1,0 +1,95 @@
+.app {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+}
+
+.app h1 {
+  margin: 0;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.subtitle {
+  margin: 0.25rem 0 2rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+blockquote {
+  margin: 0 0 2.5rem;
+  padding: 0.75rem 0 0.75rem 1rem;
+  border-left: 3px solid var(--accent);
+  color: var(--text-strong);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.app h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.app ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.app li::before {
+  content: '○';
+  color: var(--text-muted);
+}
+
+.app li.done::before {
+  content: '●';
+  color: var(--accent);
+}
+
+.app li.done {
+  color: var(--text-strong);
+}
+
+.app li.todo {
+  color: var(--text-muted);
+}
+
+footer {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-top: 3rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+footer code {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 480px) {
+  .app {
+    padding-top: 2rem;
+  }
+
+  .app h1 {
+    font-size: 1.9rem;
+  }
+}

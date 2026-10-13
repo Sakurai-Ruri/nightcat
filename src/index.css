@@ -1,0 +1,36 @@
+:root {
+  --bg: #0e1016;
+  --surface: #171a23;
+  --border: #262a36;
+  --text: #c9cdd8;
+  --text-strong: #f2f4f8;
+  --text-muted: #7d8496;
+  --accent: #7aa2ff;
+
+  --sans: system-ui, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  font: 16px/1.6 var(--sans);
+  color: var(--text);
+  background-color: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+}
+
+code {
+  font-family: var(--mono);
+}
