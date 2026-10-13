@@ -2,17 +2,42 @@
 
 核心原则：**领域逻辑与运行环境分离；变化大的部分通过接口隔离。**
 
-## 当前真实状态（第 1 步之后）
+## 当前真实状态（第 2 步之后）
 
 ```text
 index.html
   └─ src/main.tsx            挂载 React 根节点（StrictMode）
-       └─ src/app/App.tsx    静态骨架页，无领域逻辑
+       └─ src/app/App.tsx    静态骨架页，仍未接入领域计算
             └─ src/app/App.css
        └─ src/index.css      全局 CSS 变量
+
+src/domain/                  ← 已实现，可用 node --test 独立验证
+  ├─ schedule.ts             Schedule / TimeOfDay / DurationMinutes / 校验
+  ├─ personalDay.ts          resolvePersonalDay：个人日锚点（D-007）
+  ├─ personalTime.ts         computePersonalClock：个人时间与清醒状态
+  └─ personalTime.test.ts    32 个测试，覆盖边界与已知局限
+
+src/components/、src/providers/、src/engines/   仍是 .gitkeep 目录占位
 ```
 
-`src/domain`、`src/providers`、`src/engines`、`src/components` 目前只有 `.gitkeep`，是**目录占位**，不是已实现模块。数据流目前只有"React 渲染静态 JSX"这一条。
+数据流目前有两条、且**尚未连通**：
+
+1. 工程链路：`main.tsx` → `App.tsx`（静态 JSX，没有任何计算）。
+2. 领域链路：`schedule.ts` ← `personalDay.ts` ← `personalTime.ts`，只被测试调用。
+
+第 3 步要做的正是把第 2 条接到第 1 条上。
+
+## TypeScript 项目划分（三个 project reference）
+
+`tsc -b` 会依次检查三个项目，它们的运行环境不同，混在一起会互相污染类型：
+
+| 配置 | 覆盖范围 | `types` | 为什么不合并 |
+| --- | --- | --- | --- |
+| `tsconfig.app.json` | `src/`（**排除** `*.test.ts`） | `vite/client`、DOM | 浏览器代码不该看见 `process` 这类 Node 全局 |
+| `tsconfig.node.json` | `vite.config.ts` | `node` | 构建配置运行在 Node 里，不需要 DOM |
+| `tsconfig.test.json` | `src/**/*.test.ts` | `node` | 测试用 `node:test`，不该看见 DOM |
+
+关键点：`tsconfig.app.json` 必须显式 `exclude` 测试文件。否则 `include: ["src"]` 会把测试文件也纳入浏览器项目的检查，而它用的是 `node:test`——于是 `tsc -b` 会在"给浏览器准备的配置"里报 Node 类型错误。
 
 ## 目标结构（V0 完成时）
 
@@ -31,10 +56,10 @@ StorageProvider：位于底层，为上层提供持久化，
 
 | 模块 | 职责 | 落地步骤 |
 | --- | --- | --- |
-| `PersonalClock` | 计算个人时间、起床后时长、距离睡眠时长 | 第 2 步 |
-| `PersonalDayResolver` | 决定某个真实时间属于哪个个人日 | 第 2 步 |
-| `SolarProvider` | 提供日出、日落等太阳信息（本地算法，见 D-008） | 第 4 步 |
-| `WeatherProvider` | 提供天气与云量信息 | V0.2 |
+| `PersonalClock` | 计算个人时间、起床后时长、距离睡眠时长 | ✅ 第 2 步 |
+| `PersonalDayResolver` | 决定某个真实时间属于哪个个人日 | ✅ 第 2 步 |
+| `SolarProvider` | 提供日出、日落等太阳信息（Open-Meteo API，见 D-010；原"本地算法"决策已由 D-008 记录推翻过程） | 第 4 步 |
+| `WeatherProvider` | 提供天气与云量信息（与 SolarProvider 同源、同一次请求，见 D-010） | V0.2 |
 | `ContextEngine` | 把作息、太阳、天气、日历数据标准化为 `DailyContext` | 第 4 步起 |
 | `AdviceEngine` | 根据 `DailyContext` 生成建议 | 第 6 步 |
 | `StorageProvider` | 保存与读取用户设置、历史记录 | 第 5 步 |

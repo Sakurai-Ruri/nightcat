@@ -9,15 +9,14 @@ NightCat 是一个面向非传统作息用户的**个人时间系统**。它不�
 
 完整设计见 [`docs/PROJECT_DESIGN.md`](docs/PROJECT_DESIGN.md)。
 
-## 当前状态：V0 工程基线
+## 当前状态：V0 骨架 + 领域层核心计算
 
-已完成（第 1 步）：
+已完成：
 
-- React 19 + TypeScript 6 + Vite 8 工程可构建、可热更新
-- 目录骨架按设计文档第 13 节立起
-- `tsc -b` 类型检查与 `oxlint` 静态检查均无告警
+- **第 1 步**：React 19 + TypeScript 6 + Vite 8 工程可构建、可热更新；目录骨架按设计文档第 13 节立起
+- **第 2 步**：`Schedule` / `PersonalDayResolver` / `PersonalClock` 三个领域模块，32 个测试全绿
 
-尚未实现：领域逻辑、UI 计算、日照、持久化、建议引擎。因此现在还不能回答上面那两个问题。
+尚未实现：UI 计算渲染（第 3 步）、日出日落与剩余自然光（第 4 步）、IndexedDB 持久化（第 5 步）、建议引擎（第 6 步）。因此现在还不能在界面上回答"现在是我一天中的什么时候"。
 
 ## 快速开始
 
@@ -30,18 +29,21 @@ npm run dev        # http://localhost:5173
 | 命令 | 作用 |
 | --- | --- |
 | `npm run dev` | 启动开发服务器（热更新） |
-| `npm run build` | `tsc -b` 类型检查 + 生产构建，产物在 `dist/` |
+| `npm test` | 运行领域层测试（`node --test`，零测试依赖） |
+| `npm run build` | `tsc -b` 三个项目类型检查 + 生产构建，产物在 `dist/` |
 | `npm run lint` | oxlint 静态检查 |
 | `npm run preview` | 本地预览 `dist/` 构建产物 |
+
+> 若 npm 报 `EPERM`（本机 `~/.npm/_cacache` 有 root 属主文件），加 `--cache ../.npm-cache`：缓存目录在该用户目录下之外，避免用 sudo 改家目录权限。
 
 ## 目录结构
 
 ```text
 nightcat/
 ├─ src/
-│  ├─ app/          应用外壳（App.tsx / App.css）
+│  ├─ app/          应用外壳（App.tsx / App.css）— 第 3 步接入真实数据
 │  ├─ components/   展示组件：PersonalClock / SunlightCard / AdvicePanel
-│  ├─ domain/       领域模型：schedule / personalTime / personalDay / context
+│  ├─ domain/       领域模型（已成模块）见下方
 │  ├─ providers/    外部数据适配：solar / weather / storage
 │  ├─ engines/      contextEngine / adviceEngine
 │  ├─ index.css     全局样式变量
@@ -52,7 +54,23 @@ nightcat/
 └─ vite.config.ts
 ```
 
-未落地的目录用 `.gitkeep` 占位，在对应步骤实现真实模块时删除——不提前创建空模块。
+未落地的目录仍用 `.gitkeep` 占位；`src/domain/` 已实现，占位文件已删除。
+
+## 领域层（第 2 步）
+
+| 模块 | 职责 | 关键约定 |
+| --- | --- | --- |
+| `domain/schedule.ts` | `Schedule` 类型、`TimeOfDay` / `DurationMinutes`、作息合法性校验 | 起床时刻同时是个人日锚点 |
+| `domain/personalDay.ts` | `resolvePersonalDay(wakeAt, at)`：某时刻属于哪个个人日 | 个人日 = 当天起床时刻 → 次日同一时刻 |
+| `domain/personalTime.ts` | `computePersonalClock(schedule, at)`：个人时间、起床后时长、睡眠状态 | 未起床时 `awakeMinutes` 为 `null`，不用负数 |
+
+三条设计取舍，都有测试钉住：
+
+1. **个人日以起床时刻为锚**（D-007）。13:00 起床的人，次日 03:00 仍属于前一天的个人日。
+2. **状态判定用未取整的瞬时值**，显示值才取整到分钟。若用取整值判状态，"就寝前一秒"会被误判成 `asleep`。
+3. **`awakeMinutes + untilSleepMinutes` 恒等于清醒期总长**。两个数字若各自独立取整，会出现"已清醒 960 分钟、距就寝还剩 1 分钟"这种自相矛盾的显示。
+
+已知局限（已在测试中显式记录，不假装不存在）：`elapsedMinutes` 按本地时间字段直接相减，**不补偿夏令时跳变**，切换日的真实经过时长可能与之相差 1 小时；连续熬夜超过 24 小时不会切分个人日。
 
 ## 依赖说明
 
