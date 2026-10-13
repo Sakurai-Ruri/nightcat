@@ -29,8 +29,13 @@ NightCat 是一个面向非传统作息用户的**个人时间系统**。它不�
 ```bash
 cd nightcat
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # 打开 http://127.0.0.1:5173
 ```
+
+> **地址一律用 `http://127.0.0.1:5173`，不要用 `localhost`。** 本机 `localhost` 会同时解析到
+> IPv4 与 IPv6 两个地址，而 Vite 默认只绑 IPv6 回环；浏览器先试 IPv4 时会报"无法访问此网站"，
+> 但命令行 `curl` 却能通，极易误判成服务没起来。`vite.config.ts` 已写死 `host: '127.0.0.1'` 消除这个歧义，
+> 排查过程见 `docs/learning.md`。
 
 | 命令 | 作用 |
 | --- | --- |
