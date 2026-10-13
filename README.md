@@ -9,14 +9,20 @@ NightCat 是一个面向非传统作息用户的**个人时间系统**。它不�
 
 完整设计见 [`docs/PROJECT_DESIGN.md`](docs/PROJECT_DESIGN.md)。
 
-## 当前状态：V0 骨架 + 领域层核心计算
+## 当前状态：最小可用界面已跑通
 
 已完成：
 
 - **第 1 步**：React 19 + TypeScript 6 + Vite 8 工程可构建、可热更新；目录骨架按设计文档第 13 节立起
-- **第 2 步**：`Schedule` / `PersonalDayResolver` / `PersonalClock` 三个领域模块，32 个测试全绿
+- **第 2 步**：`Schedule` / `PersonalDayResolver` / `PersonalClock` 三个领域模块，纯计算、可用固定时间数据验证
+- **第 3 步**：最小 UI——显示民用时间与个人时间，作息**可编辑并持久化**（`StorageProvider` 接口 + localStorage，见 D-013）
 
-尚未实现：UI 计算渲染（第 3 步）、日出日落与剩余自然光（第 4 步）、IndexedDB 持久化（第 5 步）、建议引擎（第 6 步）。因此现在还不能在界面上回答"现在是我一天中的什么时候"。
+测试合计 **57 条**，`npm test` 全绿。
+
+尚未实现：日出日落与剩余自然光（第 4 步）、IndexedDB（第 5 步）、建议引擎（第 6 步）。
+所以现在能回答"现在是我一天中的什么时候"，**还不能**回答"今天还剩多少自然光"。
+
+**你还没亲自确认的事情**都在 [`docs/human-review.md`](docs/human-review.md) 里（git 署名、npm 缓存、动手 Review 等）。
 
 ## 快速开始
 
@@ -36,31 +42,37 @@ npm run dev        # http://localhost:5173
 
 > 若 npm 报 `EPERM`（本机 `~/.npm/_cacache` 有 root 属主文件），加 `--cache ../.npm-cache`：缓存目录在该用户目录下之外，避免用 sudo 改家目录权限。
 
+打开页面后：
+
+1. 首次打开会让你填作息（起床 / 就寝两个时刻，**睡多久是自动算的**，不需要你填三个数字）
+2. 点保存 → 刷新页面 → 数据仍在
+3. 想改就点"修改作息"
+
 ## 目录结构
 
 ```text
 nightcat/
 ├─ src/
-│  ├─ app/          应用外壳（App.tsx / App.css）— 第 3 步接入真实数据
-│  ├─ components/   展示组件：PersonalClock / SunlightCard / AdvicePanel
-│  ├─ domain/       领域模型（已成模块）见下方
-│  ├─ providers/    外部数据适配：solar / weather / storage
-│  ├─ engines/      contextEngine / adviceEngine
+│  ├─ app/          App.tsx / clockView.ts（领域→文案，可测）/ format.ts / useCurrentTime.ts
+│  ├─ components/   PersonalClock.tsx（民用+个人时间）、ScheduleSettings.tsx（作息表单）
+│  ├─ domain/       纯计算：schedule / personalDay / personalTime
+│  ├─ providers/    storage/（已实现）；solar/、weather/ 待第 4 步
+│  ├─ engines/      contextEngine / adviceEngine（仍为占位）
 │  ├─ index.css     全局样式变量
 │  └─ main.tsx      React 入口
-├─ docs/            领域、架构、决策、学习笔记
+├─ docs/            领域、架构、决策、学习笔记、人工确认清单
 ├─ AGENTS.md        AI 协作与学习模式规则
 ├─ index.html       Vite HTML 入口
 └─ vite.config.ts
 ```
 
-未落地的目录仍用 `.gitkeep` 占位；`src/domain/` 已实现，占位文件已删除。
+`src/domain/` 与 `src/providers/storage/` 已实现（占位文件已删）；`src/engines/` 仍是 `.gitkeep` 占位。
 
 ## 领域层（第 2 步）
 
 | 模块 | 职责 | 关键约定 |
 | --- | --- | --- |
-| `domain/schedule.ts` | `Schedule` 类型、`TimeOfDay` / `DurationMinutes`、作息合法性校验 | 起床时刻同时是个人日锚点 |
+| `domain/schedule.ts` | `Schedule` 类型、`TimeOfDay` / `DurationMinutes`、作息合法性校验 | 起床时刻同时是个人日锚点；校验包含**交叉一致性**（时长必须与两个时刻吻合） |
 | `domain/personalDay.ts` | `resolvePersonalDay(wakeAt, at)`：某时刻属于哪个个人日 | 个人日 = 当天起床时刻 → 次日同一时刻 |
 | `domain/personalTime.ts` | `computePersonalClock(schedule, at)`：个人时间、起床后时长、睡眠状态 | 未起床时 `awakeMinutes` 为 `null`，不用负数 |
 
@@ -71,6 +83,19 @@ nightcat/
 3. **`awakeMinutes + untilSleepMinutes` 恒等于清醒期总长**。两个数字若各自独立取整，会出现"已清醒 960 分钟、距就寝还剩 1 分钟"这种自相矛盾的显示。
 
 已知局限（已在测试中显式记录，不假装不存在）：`elapsedMinutes` 按本地时间字段直接相减，**不补偿夏令时跳变**，切换日的真实经过时长可能与之相差 1 小时；连续熬夜超过 24 小时不会切分个人日。
+
+## 界面（第 3 步）
+
+| 模块 | 职责 |
+| --- | --- |
+| `app/clockView.ts` | 领域对象 → 界面文案（纯函数）。**能测的逻辑尽量放在这里，组件只负责渲染** |
+| `app/format.ts` | 时间/时长格式化与 `input[type=time]` 解析（脏输入返回 `null`，不猜） |
+| `app/useCurrentTime.ts` | 每秒推进的当前时间（存时刻而非累加值，避免标签页挂起后漂移） |
+| `components/PersonalClock.tsx` | 民用时间、个人时间、个人日、状态、距就寝 |
+| `components/ScheduleSettings.tsx` | 两个时刻输入 + 自动算出的睡眠时长 |
+
+组件本身没有自动化验证（没有浏览器测试方案，见 D-009），因此**凡是会算错的逻辑都不许写在组件里**。
+已用无头 Chrome 实测渲染：正常显示、预置作息能正确读出并计算、数据损坏或版本不匹配时回到"请设置"。
 
 ## 依赖说明
 

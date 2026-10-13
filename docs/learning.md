@@ -96,8 +96,54 @@ Git 不追踪空目录。`src/domain/` 这类目录 V0 暂时是空的，但我�
 
 ---
 
+## 第 3 步：最小 UI（可编辑作息 + 实时个人时间）
+
+### "可编辑"这三个字推翻了原计划
+
+第 3 步本来只要求"显示 Civil Time / Personal Time"，作息可以先硬编码。但一句"不要硬编码，太不实用"就把问题变成了：**可编辑就必须持久化，否则刷新即丢，和不硬编码一样不实用**。
+
+于是第 3 步被迫提前做了第 5 步的一部分（`StorageProvider`）。这件事本身没什么特别，值得记的是**怎么把它做得不产生返工**：接口方法全部返回 `Promise`。localStorage 明明是同步的，包一层 Promise 看起来是"毫无必要的仪式"——但它让第 5 步换成异步的 IndexedDB 时调用点零改动。判断一个抽象是否值得，看的是**它挡住的未来变化**，不是当下的行数。
+
+顺带第一次真的用上了架构文档里那条判断标准：换存储实现只改 `src/providers/storage/` 一个目录。写在文档里的原则，只有被实际走通一次才算数。
+
+### 每秒刷新：存时刻，不存累加值
+
+要显示走动的秒数，最自然的写法是 `setSeconds(prev => prev + 1)`。这是错的：标签页被挂起、系统睡眠、主线程卡顿之后，累加值会与真实时间**永久性漂移**，而且越漂越多。
+
+正确做法是每次 tick 都重新读 `new Date()`——存"当前时刻"而不是"计时器状态"。同理，重排下一次 tick 的延迟时用 `intervalMs - (Date.now() % intervalMs)` 对齐整秒，否则时间会在 `:00.37` 这种怪时刻跳动。
+
+还有一处与 React 19 直接相关：effect 里**必须清掉定时器**。StrictMode 在开发环境会 mount→unmount→mount 跑两遍，不清理就会留下两个每秒触发的定时器。第 1 步记过这条规则，第 3 步是它第一次真的咬到代码。
+
+### 把逻辑从组件里挤出来
+
+组件没法用 `node --test` 验证——没有浏览器测试方案。所以第 3 步做了一件有点刻意的拆分：**凡是会算错的字符串都不许写在组件里**。
+
+`formatDuration`（避免显示"8 小时 0 分"）、`parseTimeInput`（拒绝 `24:00`、`13:0`、`-1:00` 这类脏输入而不是猜）、`composeClockView`（"你还在睡"和"起床后 4 小时"两个分支）全都在纯函数模块里，组件只剩渲染。这样测到的不是"React 会不会渲染"，而是"算出来的话对不对"——后者才是真正会错的部分。
+
+代价是多了两个文件和一层间接。收益是展示层的关键判断有了 20 条测试，而它们本来会躺在组件里无法验证。
+
+### 用无头 Chrome 做端到端验证（没有安装任何东西）
+
+本机有 `/Applications/Google Chrome.app`，于是不需要装 Playwright/Puppeteer 也能验真实渲染：
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless --disable-gpu --user-data-dir=/tmp/xx \
+  --virtual-time-budget=3000 --dump-dom http://localhost:5173/
+```
+
+- `--dump-dom` 输出 **JS 执行之后**的 DOM，所以它验的是真实渲染结果，不是静态 HTML。
+- `--virtual-time-budget=3000` 给 3 秒虚拟时间让 `useEffect` 里的定时器跑起来。
+- 想预置 localStorage 就写一个临时页面 `public/__e2e-seed.html` 先写再 `location.replace('/')`——同源，所以共享 localStorage。验完删掉即可。
+
+靠它确认了三件事：页面真能显示、预置作息被读出并算出"06:00 起床 → 起床后 13 小时 58 分"、数据损坏或版本不匹配时回到"请你设置"而不是白屏。**这三条里没有一条是单元测试能覆盖的。**
+
+局限也清楚：无头模式看不到原生 `input[type=time]` 弹层的真实观感，也模拟不了真实点击，所以它替代不了"人打开浏览器看一眼"。
+
+---
+
 ## 待理解（下一步要弄清的）
 
 - Vite 的 HMR 到底替换了什么？为什么改组件能保留状态，改 `index.css` 却直接生效？
 - TypeScript 的 `verbatimModuleSyntax` 为什么要求类型导入写成 `import type { X }`？（第 2 步已经照做，但还没真正理解它的作用）
-- React 里"每秒刷新一次的当前时间"该怎么写，才能既触发重渲染又不至于把领域计算重复跑（第 3 步会遇到）。
+- `useEffect` 的清理函数在依赖变化、组件卸载、StrictMode 重挂载三种情况下分别何时执行？第 3 步的 `cancelled` 标志与定时器清理各属于哪一种？

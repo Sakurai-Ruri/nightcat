@@ -6,6 +6,7 @@
   --text-strong: #f2f4f8;
   --text-muted: #7d8496;
   --accent: #7aa2ff;
+  --warn: #ffb27a;
 
   --sans: system-ui, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

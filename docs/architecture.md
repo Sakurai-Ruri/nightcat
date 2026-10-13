@@ -2,30 +2,46 @@
 
 核心原则：**领域逻辑与运行环境分离；变化大的部分通过接口隔离。**
 
-## 当前真实状态（第 2 步之后）
+## 当前真实状态（第 3 步之后）
 
 ```text
 index.html
-  └─ src/main.tsx            挂载 React 根节点（StrictMode）
-       └─ src/app/App.tsx    静态骨架页，仍未接入领域计算
+  └─ src/main.tsx                    挂载 React 根节点（StrictMode）
+       └─ src/app/App.tsx            接线：读存储 → 算视图 → 渲染
+            ├─ src/app/useCurrentTime.ts   每秒推进的"当前时间"
+            ├─ src/app/clockView.ts        领域对象 → 界面文案（纯函数，可测）
+            ├─ src/app/format.ts           时间/时长格式化（纯函数，可测）
+            ├─ src/components/PersonalClock.tsx     民用时间 / 个人时间 / 状态
+            ├─ src/components/ScheduleSettings.tsx  作息设置表单
             └─ src/app/App.css
-       └─ src/index.css      全局 CSS 变量
+       └─ src/index.css              全局 CSS 变量
 
-src/domain/                  ← 已实现，可用 node --test 独立验证
-  ├─ schedule.ts             Schedule / TimeOfDay / DurationMinutes / 校验
-  ├─ personalDay.ts          resolvePersonalDay：个人日锚点（D-007）
-  ├─ personalTime.ts         computePersonalClock：个人时间与清醒状态
-  └─ personalTime.test.ts    32 个测试，覆盖边界与已知局限
+src/domain/                          ← 纯计算，可用 node --test 独立验证
+  ├─ schedule.ts                     Schedule / TimeOfDay / DurationMinutes / 校验
+  ├─ personalDay.ts                  resolvePersonalDay：个人日锚点（D-007）
+  └─ personalTime.ts                 computePersonalClock：个人时间与清醒状态
 
-src/components/、src/providers/、src/engines/   仍是 .gitkeep 目录占位
+src/providers/storage/               ← 持久化边界（第 3 步落地，D-013）
+  ├─ index.ts                        StorageProvider 接口 + 错误类型
+  ├─ scheduleRecord.ts               持久化格式与转换（纯函数，可测）
+  └─ localStorage.ts                 localStorage 实现 + 内存兜底
+
+src/engines/                         仍是 .gitkeep 目录占位
 ```
 
-数据流目前有两条、且**尚未连通**：
+数据流现已**连通**：
 
-1. 工程链路：`main.tsx` → `App.tsx`（静态 JSX，没有任何计算）。
-2. 领域链路：`schedule.ts` ← `personalDay.ts` ← `personalTime.ts`，只被测试调用。
+```text
+localStorage ──load──► App ──schedule──► composeClockView ──view──► PersonalClock
+                        │                        ▲
+                        │                   useCurrentTime（每秒一次）
+                        │
+                   ScheduleSettings ──onSave──► storage.saveSchedule
+```
 
-第 3 步要做的正是把第 2 条接到第 1 条上。
+第 3 步刻意把**能测的逻辑从组件里挤出来**：组件本身没有自动化验证（没有浏览器测试方案，D-009），
+所以"状态文案怎么拼""时长怎么格式化"都放进了 `clockView.ts` / `format.ts` 两个纯函数模块，
+组件只剩渲染。这也是"第 3 步只做第 3 步的事"和"要能自动验证"之间的折中。
 
 ## TypeScript 项目划分（三个 project reference）
 
@@ -62,7 +78,7 @@ StorageProvider：位于底层，为上层提供持久化，
 | `WeatherProvider` | 提供天气与云量信息（与 SolarProvider 同源、同一次请求，见 D-010） | V0.2 |
 | `ContextEngine` | 把作息、太阳、天气、日历数据标准化为 `DailyContext` | 第 4 步起 |
 | `AdviceEngine` | 根据 `DailyContext` 生成建议 | 第 6 步 |
-| `StorageProvider` | 保存与读取用户设置、历史记录 | 第 5 步 |
+| `StorageProvider` | 保存与读取用户设置、历史记录 | 🟡 第 3 步已落地 localStorage（D-013）；第 5 步换 IndexedDB |
 | `CalendarProvider` | 读取 Google Calendar / Exchange / Outlook 日程 | V0.4 |
 
 ## 依赖方向规则
@@ -75,6 +91,13 @@ StorageProvider：位于底层，为上层提供持久化，
 6. `domain` 内部不使用 `Date` 对象参与计算，只用 `TimeOfDay`（0–1439 的分钟数）与 `DurationMinutes` 做整数运算。`Date` 只在边界（读取设备当前时间、格式化展示）出现，这样领域层不受时区与夏令时影响。
 
 判断标准：如果我要把日出算法从"本地计算"换成"调用 API"，应该只改 `src/providers/solar` 一处——如果需要改 `PersonalClock` 或组件，说明抽象漏了。
+
+**这条判断标准已经在 Storage 上实测过一次**：第 3 步把持久化从 localStorage 换成（将来）IndexedDB 时，
+需要改的只有 `src/providers/storage/` 一个目录——`App.tsx` 只认 `StorageProvider` 接口，
+领域层完全不知道存储存在。这就是"隔离变化点"从口号变成可检验事实的样子。
+
+同理，为了让第 4 步的接入也能满足这条标准，`App.tsx` 里不出现任何 `fetch`，
+只出现 `storage.loadSchedule()` 这样的接口调用。
 
 ## 变化点清单（最值得隔离的部分）
 
