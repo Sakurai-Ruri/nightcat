@@ -33,7 +33,7 @@ StorageProvider：位于底层，为上层提供持久化，
 | --- | --- | --- |
 | `PersonalClock` | 计算个人时间、起床后时长、距离睡眠时长 | 第 2 步 |
 | `PersonalDayResolver` | 决定某个真实时间属于哪个个人日 | 第 2 步 |
-| `SolarProvider` | 提供日出、日落等太阳信息 | 第 4 步 |
+| `SolarProvider` | 提供日出、日落等太阳信息（本地算法，见 D-008） | 第 4 步 |
 | `WeatherProvider` | 提供天气与云量信息 | V0.2 |
 | `ContextEngine` | 把作息、太阳、天气、日历数据标准化为 `DailyContext` | 第 4 步起 |
 | `AdviceEngine` | 根据 `DailyContext` 生成建议 | 第 6 步 |
@@ -46,6 +46,8 @@ StorageProvider：位于底层，为上层提供持久化，
 2. `domain` 不 import 任何 provider、任何浏览器 API（`localStorage` / `IndexedDB` / `fetch`），也不 import React。它只描述概念与纯计算，因此可以用固定时间数据直接测试。
 3. provider 实现 domain 中定义的接口；`contextEngine` 只依赖接口，不依赖具体实现。
 4. 组件（`src/components`）只接收已算好的数据并渲染，不自己发请求、不自己读数据库。
+5. `src/domain/**` 与 `src/engines/**` 内部的相对导入一律带 `.ts` 后缀（`import { x } from './foo.ts'`）。这是 `node --test` 的硬要求，与模板的 `allowImportingTsExtensions` 一致，详见 D-009。
+6. `domain` 内部不使用 `Date` 对象参与计算，只用 `TimeOfDay`（0–1439 的分钟数）与 `DurationMinutes` 做整数运算。`Date` 只在边界（读取设备当前时间、格式化展示）出现，这样领域层不受时区与夏令时影响。
 
 判断标准：如果我要把日出算法从"本地计算"换成"调用 API"，应该只改 `src/providers/solar` 一处——如果需要改 `PersonalClock` 或组件，说明抽象漏了。
 
